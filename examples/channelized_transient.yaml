@@ -1,0 +1,54 @@
+# Synthetic channelized reservoir generated with truncated-Gaussian facies,
+# per-facies porosity fields and poro-perm transforms. Single-phase transient
+# injection/production (liquid, slightly compressible).
+
+grid:
+  type: cartesian
+  dims: [40, 40, 5]
+  dx: 25.0
+  dy: 25.0
+  dz: 4.0
+  tops: {expr: "2000 + 0.05 * ((I - 20.5)**2 + (J - 20.5)**2)"}   # structural dome, crest at 2000 m
+  actnum: {expr: "(I - 20.5)**2 + (J - 20.5)**2 < 20.5**2"}   # circular reservoir outline
+
+properties:
+  FACIES:
+    source: truncated_gaussian
+    proportions: [0.65, 0.35]         # 1 = floodplain, 2 = channel sand
+    variogram: {type: gaussian, range: [600, 80, 8], azimuth: 30}
+    seed: 11
+  PORO_BG:
+    source: gaussian_field
+    mean: 0.12
+    std: 0.03
+    variogram: {type: exponential, range: [300, 300, 6]}
+    seed: 12
+    clip: [0.02, 0.3]
+  PORO_CH:
+    source: gaussian_field
+    mean: 0.25
+    std: 0.03
+    variogram: {type: exponential, range: [400, 100, 6], azimuth: 30}
+    seed: 13
+    clip: [0.1, 0.35]
+  PORO:   {expr: "where(FACIES == 2, PORO_CH, PORO_BG)"}
+  PERMX:
+    source: poro_perm
+    from: PORO
+    by: FACIES
+    params:
+      1: {a: 12.0, b: -0.8}
+      2: {a: 10.0, b: 0.2}
+  PERMZ:  {expr: "0.05 * PERMX"}
+  SATNUM: {copy: FACIES}
+
+simulation:
+  type: transient
+  fluid: {viscosity: 1.0, density: 850.0, compressibility: 1.0e-4}
+  rock_compressibility: 5.0e-5
+  initial_pressure: 250.0
+  timestep: 5.0
+  steps: 20
+  sources:
+    - {cell: [6, 8, 3], rate: 400.0}      # injector (in channel sand)
+    - {cell: [30, 30, 3], rate: -400.0}    # producer (in channel sand)
